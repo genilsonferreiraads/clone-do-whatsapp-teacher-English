@@ -31,6 +31,7 @@ code {
 /* Estilos para o layout fixo do chat */
 .chat-container {
   height: 100vh;
+  height: 100dvh; /* Usa dynamic viewport height para dispositivos móveis */
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -39,6 +40,7 @@ code {
 .chat-header {
   flex-shrink: 0;
   z-index: 10;
+  min-height: 70px; /* Altura mínima garantida para o header */
 }
 
 .chat-messages {
@@ -47,18 +49,65 @@ code {
   overflow-x: hidden;
   /* Previne problemas de scroll em dispositivos móveis */
   -webkit-overflow-scrolling: touch;
+  /* Garante que a área de mensagens ocupe o espaço disponível */
+  min-height: 0;
 }
 
 .chat-input {
   flex-shrink: 0;
   z-index: 10;
+  min-height: 80px; /* Altura mínima garantida para o input */
 }
 
 /* Melhorias para dispositivos móveis */
 @media (max-width: 768px) {
+  .chat-container {
+    /* Usa viewport dinâmico para dispositivos móveis */
+    height: 100dvh;
+  }
+  
+  .chat-header {
+    /* Header mais compacto em mobile */
+    min-height: 60px;
+    padding: 12px 16px;
+  }
+  
   .chat-messages {
-    /* Altura calculada para mobile: 100vh - header - input */
-    height: calc(100vh - 80px - 100px);
+    /* Remove altura fixa, deixa o flex calcular */
+    height: auto;
+    flex: 1;
+  }
+  
+  .chat-input {
+    /* Input mais compacto em mobile */
+    min-height: 70px;
+    padding: 12px 16px;
+  }
+}
+
+/* Específico para iPhone */
+@media screen and (max-width: 428px) {
+  .chat-header {
+    min-height: 55px;
+    padding: 10px 12px;
+  }
+  
+  .chat-input {
+    min-height: 65px;
+    padding: 10px 12px;
+  }
+}
+
+/* Para telas muito pequenas */
+@media screen and (max-height: 600px) {
+  .chat-header {
+    min-height: 50px;
+    padding: 8px 12px;
+  }
+  
+  .chat-input {
+    min-height: 60px;
+    padding: 8px 12px;
   }
 }
 

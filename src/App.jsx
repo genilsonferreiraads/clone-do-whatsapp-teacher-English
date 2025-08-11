@@ -938,7 +938,7 @@ const App = () => {
     };
 
     return (
-        <div className="h-screen bg-[#E5DDD5] font-[Inter] antialiased flex flex-col overflow-hidden chat-container">
+        <div className="h-screen h-[100dvh] bg-[#E5DDD5] font-[Inter] antialiased flex flex-col overflow-hidden chat-container">
 
             {/* Modal de Tradução de Palavra */}
             {isModalOpen && (
@@ -1246,7 +1246,7 @@ const App = () => {
             {isLoggedIn && (
                 <>
                 {/* Header do Chat - FIXO NO TOPO */}
-                <header className="flex items-center p-4 bg-[#075E54] border-b border-gray-200 shadow-md flex-shrink-0 z-10 chat-header">
+                <header className="flex items-center p-3 md:p-4 bg-[#075E54] border-b border-gray-200 shadow-md flex-shrink-0 z-10 chat-header">
                 <button
                     onClick={handleOpenProfileModal}
                     className="rounded-full w-10 h-10 overflow-hidden hover:opacity-80 transition-opacity cursor-pointer"
@@ -1338,7 +1338,7 @@ const App = () => {
             </header>
 
             {/* Container das Mensagens - SCROLLÁVEL */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4 scroll-smooth chat-messages">
+            <div className="flex-1 overflow-y-auto p-3 md:p-4 space-y-4 scroll-smooth chat-messages">
                 <style jsx>{`
                     @keyframes slideInFromBottom {
                         from {
@@ -1497,7 +1497,7 @@ const App = () => {
             </div>
 
             {/* Barra de Input - FIXA NA PARTE INFERIOR */}
-            <div className="p-4 bg-[#F0F0F0] border-t border-gray-300 flex-shrink-0 z-10 chat-input">
+            <div className="p-3 md:p-4 bg-[#F0F0F0] border-t border-gray-300 flex-shrink-0 z-10 chat-input">
                 <div className="flex items-end bg-white rounded-3xl p-3 shadow-inner gap-2">
                     {/* Input de texto */}
                     <textarea
