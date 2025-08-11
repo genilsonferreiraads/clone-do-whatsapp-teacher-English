@@ -16,9 +16,78 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* Previne o scroll do body em dispositivos móveis */
+  overflow: hidden;
+  position: fixed;
+  width: 100%;
+  height: 100%;
 }
 
 code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
+}
+
+/* Estilos para o layout fixo do chat */
+.chat-container {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.chat-header {
+  flex-shrink: 0;
+  z-index: 10;
+}
+
+.chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  /* Previne problemas de scroll em dispositivos móveis */
+  -webkit-overflow-scrolling: touch;
+}
+
+.chat-input {
+  flex-shrink: 0;
+  z-index: 10;
+}
+
+/* Melhorias para dispositivos móveis */
+@media (max-width: 768px) {
+  .chat-messages {
+    /* Altura calculada para mobile: 100vh - header - input */
+    height: calc(100vh - 80px - 100px);
+  }
+}
+
+/* Previne zoom em inputs no iOS */
+@media screen and (-webkit-min-device-pixel-ratio: 0) {
+  input, textarea {
+    font-size: 16px;
+  }
+}
+
+/* Melhorias para o scroll suave */
+.chat-messages {
+  scroll-behavior: smooth;
+}
+
+/* Estilos para o scrollbar personalizado */
+.chat-messages::-webkit-scrollbar {
+  width: 6px;
+}
+
+.chat-messages::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.chat-messages::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 3px;
+}
+
+.chat-messages::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.3);
 } 
