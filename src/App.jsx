@@ -1096,7 +1096,7 @@ const App = () => {
                             </button>
                             <div className="w-16 h-16 mx-auto mb-3 rounded-full overflow-hidden border-3 border-white shadow-lg">
                                 <img
-                                    src="imagem/Teacher.png"
+                                    src="/Teacher.png"
                                     alt="Foto de perfil do professor"
                                     className="w-full h-full object-cover"
                                 />
@@ -1164,7 +1164,7 @@ const App = () => {
                         <div className="bg-gradient-to-r from-[#075E54] to-[#128C7E] p-6 text-white text-center">
                             <div className="w-16 h-16 mx-auto mb-4 rounded-full overflow-hidden border-3 border-white shadow-lg">
                                 <img
-                                    src="imagem/Teacher.png"
+                                    src="/Teacher.png"
                                     alt="Foto de perfil do professor"
                                     className="w-full h-full object-cover"
                                 />
@@ -1252,7 +1252,7 @@ const App = () => {
                     className="rounded-full w-10 h-10 overflow-hidden hover:opacity-80 transition-opacity cursor-pointer"
                 >
                 <img
-                    src="imagem/Teacher.png"
+                    src="/Teacher.png"
                     alt="Foto de perfil do professor sorrindo"
                         className="w-full h-full object-cover"
                 />
