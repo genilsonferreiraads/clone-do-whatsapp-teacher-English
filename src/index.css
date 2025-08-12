@@ -139,4 +139,43 @@ code {
 
 .chat-messages::-webkit-scrollbar-thumb:hover {
   background: rgba(0, 0, 0, 0.3);
+}
+
+/* Estilos para o componente de áudio */
+.audio-message {
+  transition: all 0.2s ease-in-out;
+}
+
+.audio-message:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Animação para o botão de play */
+.audio-play-button {
+  transition: all 0.2s ease-in-out;
+}
+
+.audio-play-button:hover {
+  transform: scale(1.05);
+}
+
+.audio-play-button:active {
+  transform: scale(0.95);
+}
+
+/* Estilos para a barra de progresso */
+.audio-progress-bar {
+  background: linear-gradient(90deg, #075E54 0%, #128C7E 100%);
+  transition: width 0.1s ease-out;
+}
+
+/* Efeito de onda sonora quando está tocando */
+@keyframes audioWave {
+  0%, 100% { transform: scaleY(1); }
+  50% { transform: scaleY(1.5); }
+}
+
+.audio-playing .audio-wave {
+  animation: audioWave 0.5s ease-in-out infinite;
 } 

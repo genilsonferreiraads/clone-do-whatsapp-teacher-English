@@ -6,6 +6,9 @@ import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, updateDoc
 // Biblioteca para ícones
 import { SendHorizonal, Volume2, Mic, Play, Loader2, Phone, Video, X, Lightbulb, MoreVertical, Settings, LogOut } from 'lucide-react';
 
+// Componente de áudio personalizado
+import AudioMessage from './components/AudioMessage';
+
 // ====================================================================
 // PASSO 1: Configurações do Firebase - Variáveis de Ambiente
 // Configure estas variáveis no Netlify: Site settings > Environment variables
@@ -139,6 +142,10 @@ const App = () => {
     const [loadingAudioId, setLoadingAudioId] = useState(null);
     // Estado para controlar o áudio do usuário em carregamento
     const [loadingUserAudioId, setLoadingUserAudioId] = useState(null);
+    // Estado para armazenar URLs de áudio da IA
+    const [aiAudioUrls, setAiAudioUrls] = useState(new Map());
+    // Estado para armazenar URLs de áudio do usuário
+    const [userAudioUrls, setUserAudioUrls] = useState(new Map());
     
     // Novo estado para a modal de tradução de palavras
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -441,42 +448,66 @@ const App = () => {
             setLoadingAudioId(null);
         }
     };
-    
-    // Função para reproduzir o áudio do usuário
-    const handlePlayUserAudio = (audioUri, messageId) => {
-        if (!audioUri || loadingUserAudioId) return;
 
-        setLoadingUserAudioId(messageId);
+    // Função para obter URL de áudio da IA (para o componente AudioMessage)
+    const getAiAudioUrl = async (text, messageId) => {
+        if (!text) return null;
+
+        // Verifica cache primeiro
+        if (audioCache.has(text)) {
+            const cachedUrl = audioCache.get(text);
+            console.log('Áudio encontrado no cache para:', text.substring(0, 50) + '...');
+            return cachedUrl;
+        }
         
-        let audio;
-        let objectUrl = null;
-
+        console.log('Gerando novo áudio para:', text.substring(0, 50) + '...');
+        
+        try {
+            const audioUrl = await getTtsAudio(text, "en-US");
+            if (audioUrl) {
+                console.log('Áudio gerado com sucesso');
+                setAudioCache(prevCache => new Map(prevCache).set(text, audioUrl));
+                return audioUrl;
+            } else {
+                console.error('Falha ao gerar áudio - URL retornada é null');
+            }
+        } catch (error) {
+            console.error("Erro ao gerar áudio da IA:", error);
+        }
+        return null;
+    };
+    
+    // Função para obter URL de áudio do usuário (para o componente AudioMessage)
+    const getUserAudioUrl = (audioUri) => {
+        if (!audioUri) return null;
+        
         try {
             const arrayBuffer = base64ToArrayBuffer(audioUri);
             const audioBlob = new Blob([arrayBuffer], { type: 'audio/webm' });
-            objectUrl = URL.createObjectURL(audioBlob);
-            
-            audio = new Audio(objectUrl);
-            audio.play();
-
-            audio.onended = () => {
-                setLoadingUserAudioId(null);
-                URL.revokeObjectURL(objectUrl); // Revoga a URL para liberar memória
-            };
-            audio.onerror = (e) => {
-                console.error("Erro na reprodução do áudio do usuário.", e);
-                setLoadingUserAudioId(null);
-                if (objectUrl) {
-                     URL.revokeObjectURL(objectUrl);
-                }
-            };
+            return URL.createObjectURL(audioBlob);
         } catch (error) {
-            console.error("Erro ao reproduzir o áudio do usuário:", error);
-            setLoadingUserAudioId(null);
-            if (objectUrl) {
-                 URL.revokeObjectURL(objectUrl);
-            }
+            console.error("Erro ao converter áudio do usuário:", error);
+            return null;
         }
+    };
+
+    // Função para limpar URLs de áudio (evitar vazamentos de memória)
+    const cleanupAudioUrls = () => {
+        // Limpa URLs de áudio do usuário
+        userAudioUrls.forEach(url => {
+            if (url && url.startsWith('blob:')) {
+                URL.revokeObjectURL(url);
+            }
+        });
+        setUserAudioUrls(new Map());
+        
+        // Limpa URLs de áudio da IA
+        aiAudioUrls.forEach(url => {
+            if (url && url.startsWith('blob:')) {
+                URL.revokeObjectURL(url);
+            }
+        });
+        setAiAudioUrls(new Map());
     };
 
     // Função para enviar a mensagem do usuário e obter a resposta da IA
@@ -487,7 +518,7 @@ const App = () => {
         let userMessage, audioUri = null;
 
         if (isAudio) {
-            userMessage = "O usuário enviou um áudio. Por favor, transcreva, traduza e responda.";
+            userMessage = null; // Não define texto padrão para áudio
             audioUri = messageContent;
         } else {
             userMessage = messageContent;
@@ -511,6 +542,14 @@ const App = () => {
             
             // Marcar mensagem como nova para animação
             setNewMessageIds(prev => new Set([...prev, userMessageObj.id]));
+            
+            // Gerar URL de áudio automaticamente se for áudio
+            if (isAudio && audioUri) {
+                const audioUrl = getUserAudioUrl(audioUri);
+                if (audioUrl) {
+                    setUserAudioUrls(prev => new Map(prev).set(userMessageObj.id, audioUrl));
+                }
+            }
             
             /* COMENTADO TEMPORARIAMENTE - Firebase
             const userDocRef = await addDoc(collection(db, `artifacts/${appId}/users/${userId}/messages`), {
@@ -622,7 +661,7 @@ const App = () => {
                     msg.id === userMessageObj.id 
                         ? {
                             ...msg,
-                            text_raw: jsonResponse.user_transcription || userMessage,
+                            text_raw: jsonResponse.user_transcription || null,
                             text_en: jsonResponse.user_translation_en || null,
                             text_pt: jsonResponse.user_translation_pt || null,
                         }
@@ -645,10 +684,13 @@ const App = () => {
                 // Marcar mensagem da IA como nova para animação
                 setNewMessageIds(prev => new Set([...prev, aiMessageObj.id]));
                 
-                // Reproduzir áudio automaticamente se ativado
+                // Gerar áudio automaticamente se ativado
                 if (autoPlayAudio) {
-                    setTimeout(() => {
-                        handlePlayAudio(jsonResponse.ai_response_en, aiMessageObj.id);
+                    setTimeout(async () => {
+                        const audioUrl = await getAiAudioUrl(jsonResponse.ai_response_en, aiMessageObj.id);
+                        if (audioUrl) {
+                            setAiAudioUrls(prev => new Map(prev).set(aiMessageObj.id, audioUrl));
+                        }
                     }, 500); // Pequeno delay para garantir que a mensagem foi renderizada
                 }
             } else {
@@ -1372,60 +1414,47 @@ const App = () => {
                         <div className={`relative p-3 max-w-xs md:max-w-md lg:max-w-lg rounded-xl shadow-md ${
                             msg.sender === 'user' ? 'bg-[#DCF8C6] text-gray-800 rounded-br-none' : 'bg-white text-gray-800 rounded-bl-none'
                         }`}>
-                            {msg.sender === 'user' && msg.text_raw && (
+                            {msg.sender === 'user' && (
                                 <div className="flex flex-col">
-                                    <p className="pr-16">{renderClickableText(msg.text_raw, 'português')}</p>
-                                    {/* Mostra apenas a tradução relevante */}
-                                    {(() => {
-                                        // Se tem tradução em inglês, mostra ela (mensagem original era em português)
-                                        if (msg.text_en) {
-                                            return <p className="text-sm text-gray-500 mt-1 pr-16">{renderClickableText(msg.text_en, 'inglês')}</p>;
-                                        }
-                                        // Se tem tradução em português, mostra ela (mensagem original era em inglês)
-                                        if (msg.text_pt) {
-                                            return <p className="text-sm text-gray-500 mt-1 pr-16">{renderClickableText(msg.text_pt, 'português')}</p>;
-                                        }
-                                        return null;
-                                    })()}
-                                    <span className="absolute bottom-2 right-3 text-xs text-gray-500">
-                                        {formatTime(msg.timestamp)}
-                                    </span>
-                                </div>
-                            )}
-                            {msg.sender === 'user' && msg.audio_uri && (
-                                <div className="flex flex-col">
-                                    <div className="flex items-center space-x-2">
-                                        <button
-                                            onClick={() => handlePlayUserAudio(msg.audio_uri, msg.id)}
-                                            className={`p-1 rounded-full text-white transition-colors
-                                                ${loadingUserAudioId === msg.id ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#075E54] hover:bg-[#128C7E]'}`}
-                                            aria-label="Play user audio"
-                                            disabled={loadingUserAudioId !== null}
-                                        >
-                                            {loadingUserAudioId === msg.id ? (
-                                                <Loader2 size={20} className="animate-spin text-white" />
-                                            ) : (
-                                                <Play size={20} />
-                                            )}
-                                        </button>
-                                        <div className="flex flex-col">
-                                            <p className="font-semibold text-gray-800">
-                                                {renderClickableText(msg.text_raw || 'Áudio recebido...', 'português')}
+                                    {/* Áudio se existir */}
+                                    {msg.audio_uri && (
+                                        <AudioMessage
+                                            audioUrl={userAudioUrls.get(msg.id) || ''}
+                                            isUser={true}
+                                            isLoading={false}
+                                            onPlay={async () => {
+                                                if (!userAudioUrls.has(msg.id)) {
+                                                    const audioUrl = getUserAudioUrl(msg.audio_uri);
+                                                    if (audioUrl) {
+                                                        setUserAudioUrls(prev => new Map(prev).set(msg.id, audioUrl));
+                                                    }
+                                                }
+                                            }}
+                                            onPause={() => {}}
+                                        />
+                                    )}
+                                    
+                                    {/* Texto se existir */}
+                                    {msg.text_raw && (
+                                        <div className={msg.audio_uri ? "mt-2" : ""}>
+                                            <p className={`font-semibold text-gray-800 ${!msg.audio_uri ? 'pr-16' : ''}`}>
+                                                {renderClickableText(msg.text_raw, 'português')}
                                             </p>
                                             {/* Mostra apenas a tradução relevante */}
                                             {(() => {
                                                 // Se tem tradução em inglês, mostra ela (mensagem original era em português)
                                                 if (msg.text_en) {
-                                                    return <p className="text-sm text-gray-500 mt-1">{renderClickableText(msg.text_en, 'inglês')}</p>;
+                                                    return <p className={`text-sm text-gray-500 mt-1 ${!msg.audio_uri ? 'pr-16' : ''}`}>{renderClickableText(msg.text_en, 'inglês')}</p>;
                                                 }
                                                 // Se tem tradução em português, mostra ela (mensagem original era em inglês)
                                                 if (msg.text_pt) {
-                                                    return <p className="text-sm text-gray-500 mt-1">{renderClickableText(msg.text_pt, 'português')}</p>;
+                                                    return <p className={`text-sm text-gray-500 mt-1 ${!msg.audio_uri ? 'pr-16' : ''}`}>{renderClickableText(msg.text_pt, 'português')}</p>;
                                                 }
                                                 return null;
                                             })()}
                                         </div>
-                                    </div>
+                                    )}
+                                    
                                     <span className="absolute bottom-2 right-3 text-xs text-gray-500">
                                         {formatTime(msg.timestamp)}
                                     </span>
@@ -1433,52 +1462,66 @@ const App = () => {
                             )}
                             {msg.sender === 'ai' && msg.text_en && (
                                 <>
-                                    <p className="pr-16">{renderClickableText(msg.text_en, 'inglês')}</p>
-                                    {msg.text_pt && (
-                                        <p className="text-sm text-gray-600 mt-1 pr-16">{renderClickableText(msg.text_pt, 'português')}</p>
+                                    {/* Componente de áudio da IA */}
+                                    <div className="mb-3">
+                                        <AudioMessage
+                                            audioUrl={aiAudioUrls.get(msg.id) || ''}
+                                            isUser={false}
+                                            profileImage="/Teacher.png"
+                                            isLoading={loadingAudioId === msg.id}
+                                            onPlay={async () => {
+                                                if (!aiAudioUrls.has(msg.id)) {
+                                                    setLoadingAudioId(msg.id);
+                                                    const audioUrl = await getAiAudioUrl(msg.text_en, msg.id);
+                                                    if (audioUrl) {
+                                                        setAiAudioUrls(prev => new Map(prev).set(msg.id, audioUrl));
+                                                    }
+                                                    setLoadingAudioId(null);
+                                                }
+                                            }}
+                                            onPause={() => setLoadingAudioId(null)}
+                                        />
+                                    </div>
+                                    
+                                    {/* Texto da mensagem */}
+                                    <div className="pr-16">
+                                        <p>{renderClickableText(msg.text_en, 'inglês')}</p>
+                                        {msg.text_pt && (
+                                            <p className="text-sm text-gray-600 mt-1">{renderClickableText(msg.text_pt, 'português')}</p>
+                                        )}
+                                    </div>
+                                    
+                                    {/* Correção */}
+                                    {msg.correction_pt && (
+                                        <div className="mt-2 p-2 bg-yellow-100 text-yellow-800 rounded-lg">
+                                            <h4 className="font-bold">Correção:</h4>
+                                            <p className="text-sm">{msg.correction_pt}</p>
+                                        </div>
+                                    )}
+                                    
+                                    {/* Sugestões */}
+                                    {msg.suggestions && msg.suggestions.length > 0 && (
+                                        <div className="mt-4 p-2 bg-purple-50 text-purple-800 rounded-lg shadow-inner mb-6">
+                                            <h4 className="flex items-center font-bold mb-2">
+                                                <Lightbulb size={16} className="mr-2" />
+                                                Ideias para continuar a conversa:
+                                            </h4>
+                                            <ul className="list-disc list-inside space-y-1">
+                                                {msg.suggestions.map((sug, i) => (
+                                                    <li key={i} className="text-sm">
+                                                        <button
+                                                            onClick={() => handleSuggestionClick(sug.en)}
+                                                            className="text-left font-semibold text-purple-700 hover:underline"
+                                                        >
+                                                            {sug.en}
+                                                        </button>
+                                                        <p className="text-xs text-purple-600">{sug.pt}</p>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        </div>
                                     )}
                                 </>
-                            )}
-                            {msg.sender === 'ai' && msg.correction_pt && (
-                                <div className="mt-2 p-2 bg-yellow-100 text-yellow-800 rounded-lg">
-                                    <h4 className="font-bold">Correção:</h4>
-                                    <p className="text-sm">{msg.correction_pt}</p>
-                                </div>
-                            )}
-                            {msg.sender === 'ai' && msg.text_en && (
-                                <button
-                                    onClick={() => handlePlayAudio(msg.text_en, msg.id)}
-                                    className="mt-2 p-1 rounded-full bg-gray-200 hover:bg-gray-300 transition-colors"
-                                    aria-label="Play audio"
-                                    disabled={loadingAudioId !== null}
-                                >
-                                    {loadingAudioId === msg.id ? (
-                                        <Loader2 size={16} className="animate-spin text-gray-600" />
-                                    ) : (
-                                        <Volume2 size={16} className="text-gray-600" />
-                                    )}
-                                </button>
-                            )}
-                            {msg.sender === 'ai' && msg.suggestions && msg.suggestions.length > 0 && (
-                                <div className="mt-4 p-2 bg-purple-50 text-purple-800 rounded-lg shadow-inner mb-6">
-                                    <h4 className="flex items-center font-bold mb-2">
-                                        <Lightbulb size={16} className="mr-2" />
-                                        Ideias para continuar a conversa:
-                                    </h4>
-                                    <ul className="list-disc list-inside space-y-1">
-                                        {msg.suggestions.map((sug, i) => (
-                                            <li key={i} className="text-sm">
-                                                <button
-                                                    onClick={() => handleSuggestionClick(sug.en)}
-                                                    className="text-left font-semibold text-purple-700 hover:underline"
-                                                >
-                                                    {sug.en}
-                                                </button>
-                                                <p className="text-xs text-purple-600">{sug.pt}</p>
-                                            </li>
-                                        ))}
-                                    </ul>
-                                </div>
                             )}
                             <span className="absolute bottom-2 right-3 text-xs text-gray-500">
                                 {formatTime(msg.timestamp)}
